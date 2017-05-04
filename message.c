@@ -18,7 +18,12 @@ typedef struct{
 	int p_byte;
 	int p_bit;
 }POSITION;
-
+VEHICLESTATUS_INFO g_vehicleInfo;
+#define printf 
+void getVehiclestatusInfo(VEHICLESTATUS_INFO *vehicleInfo)
+{
+	memcpy(vehicleInfo,&g_vehicleInfo,sizeof(VEHICLESTATUS_INFO));
+}
 void vehiclestatus_caculate(int *val)
 {
 	VEHICLESTATUS_INFO vehicle_info;
@@ -35,6 +40,7 @@ void vehiclestatus_caculate(int *val)
 	vehicle_info.fcwsensitivity=val[12];
 	vehicle_info.breaklevel=val[13];
 	vehicle_info.gearshift=val[14];
+	memcpy(&g_vehicleInfo,&vehicle_info,sizeof(VEHICLESTATUS_INFO));
 }
 void getbit(char *m,int *byte,int *bit,int num,int *val)
 {
@@ -110,20 +116,23 @@ void syscontrol_rx_resolver(char *message)
 	int seqnum=message[2];
 	int commad=message[3];	
 }
+
 int crc8_err(char *message)
 {
 	int packetsize=message[1];
 	int crc=0;
 	int i=0;
-	printf("%s:packetsize %d  crc %x \n",__func__,packetsize,crc);
 
 	return 0;
 }
+
 int message_resolver(char *message)
 {
 	 int retval=0;
+
 	 if(crc8_err(message)<0)
 	 	return -1;
+
 	 switch(message[0])
 	 {
 	 	case VEHICLESTATUS:
@@ -137,8 +146,11 @@ int message_resolver(char *message)
 	 	default :
 	 		break; 
 	 }
+
 	 return retval;
 }
+
+
 void ldw_messagecreator(LDW_OUTINFO info,BUFINFO bufinfo)
 {
 	unsigned short temp=0,i;
@@ -186,8 +198,6 @@ void fcw_messagecreator(FCW_OUTINFO info,BUFINFO bufinfo)
 	temp=(int)(info.fcwAttc*1000);
 	message[7]=(temp&0xff00)>>8;
 	message[8]=(temp&0xff);
-
-
 
 	memcpy(bufinfo.addr,message,bufinfo.len);
 
