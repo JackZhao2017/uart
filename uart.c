@@ -166,6 +166,7 @@ int  g_isRxfinished=0;
 char *ringbuf=NULL;
 #define  BUFSIZE 256
 #define  MINSIZE 13
+
 typedef struct 
 {
 	int storageaddr;
@@ -173,6 +174,7 @@ typedef struct
 	int canstoragelen;
 	int canprocesslen;
 }RINGBUF_INFO;
+
 RINGBUF_INFO g_ringbufinfo;
 
 int readdataComplete(int val)
@@ -197,7 +199,6 @@ static int readPost(char *buf ,int len)
 }
 int storagetoRingbuf(char *buf,int len)
 {
-	printf("%s\n",__func__ );
 	if((BUFSIZE-g_ringbufinfo.storageaddr)<len){
 		memcpy(&ringbuf[g_ringbufinfo.storageaddr],buf,BUFSIZE-g_ringbufinfo.storageaddr);
 		memcpy(ringbuf,&buf[BUFSIZE-g_ringbufinfo.storageaddr],len-BUFSIZE+g_ringbufinfo.storageaddr);
@@ -206,37 +207,46 @@ int storagetoRingbuf(char *buf,int len)
 	else{
 		memcpy(&ringbuf[g_ringbufinfo.storageaddr],buf,len);
 		g_ringbufinfo.storageaddr+=len;
+		if(g_ringbufinfo.storageaddr==BUFSIZE)
+			g_ringbufinfo.storageaddr=0;
 	}
-	g_ringbufinfo.canprocesslen=
-		(g_ringbufinfo.storageaddr>g_ringbufinfo.processaddr)?
-		(g_ringbufinfo.storageaddr-g_ringbufinfo.processaddr):(BUFSIZE-g_ringbufinfo.processaddr+g_ringbufinfo.storageaddr);
+	// g_ringbufinfo.canprocesslen=
+	// 	(g_ringbufinfo.storageaddr>g_ringbufinfo.processaddr)?
+	// 	(g_ringbufinfo.storageaddr-g_ringbufinfo.processaddr):(BUFSIZE-g_ringbufinfo.processaddr+g_ringbufinfo.storageaddr);
+	g_ringbufinfo.canstoragelen-=len;
+	g_ringbufinfo.canprocesslen+=len;
 	return 0;
 }
 int getfromRingbuf(char *buf,int len)
 {
-	printf("%s\n",__func__);
 	if(g_ringbufinfo.processaddr+len>BUFSIZE){
 		memcpy(buf,&ringbuf[g_ringbufinfo.processaddr],BUFSIZE-g_ringbufinfo.processaddr);
 		memcpy(&buf[BUFSIZE-g_ringbufinfo.processaddr],ringbuf,len-BUFSIZE+g_ringbufinfo.processaddr);
+		g_ringbufinfo.processaddr=len-BUFSIZE+g_ringbufinfo.processaddr;
 	}else{
 		memcpy(buf,&ringbuf[g_ringbufinfo.processaddr],len);
+		g_ringbufinfo.processaddr+=len;
+		if(g_ringbufinfo.processaddr==BUFSIZE)
+			g_ringbufinfo.processaddr=0;
 	}
 	g_ringbufinfo.canstoragelen+=len;
+	g_ringbufinfo.canprocesslen-=len;
+	printf("%d %d %d %d\n",g_ringbufinfo.processaddr,g_ringbufinfo.canprocesslen,g_ringbufinfo.storageaddr,g_ringbufinfo.canstoragelen);
 }
 int isprocessMessage()
 {
 	int i=0;
-	printf("%s\n",__func__ );
 	if(g_ringbufinfo.canprocesslen<MINSIZE)
 		return 0;
-	for(i=g_ringbufinfo.processaddr;i<g_ringbufinfo.processaddr+g_ringbufinfo.canprocesslen;i++)
+	for(i=0;i<g_ringbufinfo.canprocesslen;i++)
 	{
-		int ind=i;
+		int ind=i+g_ringbufinfo.processaddr;
 		if(ind>BUFSIZE-1)
-			ind=i-BUFSIZE;
-		if(ringbuf[ind]==VEHICLESTATUS||ringbuf[ind]==SYSCONTROL_RX){
+			ind-=BUFSIZE;
+		if(ringbuf[ind]=='t'){
 			g_ringbufinfo.processaddr=ind;
-			g_ringbufinfo.canprocesslen=g_ringbufinfo.processaddr+g_ringbufinfo.canprocesslen-i;
+			g_ringbufinfo.canprocesslen-=i;
+			g_ringbufinfo.canstoragelen+=i;
 			if(g_ringbufinfo.canprocesslen<MINSIZE)//
 				return 0;
 			return 1;
@@ -244,10 +254,12 @@ int isprocessMessage()
 	}
 	return 0;
 }
+
 int processreadData(int size)
 {
 
 }
+
 static void *uartRead(void * threadParameter)
 {
 	char *rx;
@@ -261,7 +273,12 @@ static void *uartRead(void * threadParameter)
         	storagetoRingbuf(rx,iocount);
         	free(rx);
         	if(isprocessMessage()){
-
+        		rx=malloc(13);
+        		getfromRingbuf(rx,13);
+        		//printf("%s",rx);
+        		//printf("%d %d %d %d\n",g_ringbufinfo.processaddr,g_ringbufinfo.canprocesslen,g_ringbufinfo.storageaddr,g_ringbufinfo.canstoragelen);
+        		message_resolver(rx);
+        		free(rx);
         	}	 	
 		}
 	}
@@ -273,6 +290,7 @@ int issendBusy()
 {
 	return g_isTxfinished;
 }
+
 int uartsendData(char *buf ,int len)
 {
 	if(g_txbuf)
@@ -283,6 +301,7 @@ int uartsendData(char *buf ,int len)
 	sem_post(&g_sem_tx);
 	return 0;
 }
+
 static void *uartWrite(void * threadParameter)
 {
 	printf("uartSend thread \n");
@@ -322,7 +341,7 @@ int uartInit(int argc ,char **argv)
 	options.c_oflag &= ~OPOST;
 	options.c_iflag &= ~(ICRNL | INPCK | ISTRIP | IXON | BRKINT );
 
-	options.c_cc[VMIN] = 8;
+	options.c_cc[VMIN] = 1;
 	options.c_cc[VTIME] = 0;
 	options.c_cflag |= (CLOCAL | CREAD);
 
@@ -370,6 +389,7 @@ int uartInit(int argc ,char **argv)
 	g_trun = 1;
 
 	ringbuf=(char *)malloc(BUFSIZE);
+
 	g_ringbufinfo.storageaddr=0;
 	g_ringbufinfo.processaddr=0;
 	g_ringbufinfo.canstoragelen=BUFSIZE;
