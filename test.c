@@ -10,10 +10,10 @@ void ctrl_c_handler(int signum, siginfo_t *info, void *myact)
 	ctrl_c_rev = 0;
 	return;
 }
-
+VEHICLESTATUS_INFO g_mVehicleInfo;
 int main(int argc ,char **argv)
 {
-	int count=0,ret,len;
+	int count=0,ret,len=13;
 	uartInit(argc,argv);
 	struct sigaction act;
 	sigemptyset(&act.sa_mask);
@@ -25,15 +25,33 @@ int main(int argc ,char **argv)
 	}
 	while(ctrl_c_rev)
 	{
-		// char buf[125]={0};		
-		// sprintf(buf,"this time send buf\r\n");	
-		// len=strlen(buf);
-		// while(iswriteBusy()){
-		// 	if(++count>3)
-		// 		break;
-		// }
-		// uartsendData(buf ,len);
+		// char buf[125]={0};	
+		// memset(buf,0,sizeof(buf));		
+		char buf[]={0x30,0xd,0xc8,0x00,0x18,0x64,0x3d,0xef,0x1e,0x1,0x2,0x3,0x4};//
+		while(issendBusy()){
+			if(++count>3)
+				break;
+		}
+		uartsendData(buf ,len);
 		sleep(1);
+		getVehiclestatusInfo(&g_mVehicleInfo);
+		printf("speed :            %f \n"\
+	   		   "steeringangle      %f \n"\
+	   			"steeringanglevalid %d \n"\
+	   			"leftturnon         %d \n"\
+	   			"rightturnon        %d \n"\
+	   			"frontwiperlevel    %d \n"\
+	   			"headlightstatus    %d \n"\
+	   			"ldwenabled         %d \n"\
+	   			"fcwenabled         %d \n"\
+	   			"ldwsensitivity     %d \n"\
+	   			"fcwsensitivity     %d \n"\
+	   			"breaklevel         %d \n"\
+	   			"gearshift          %d \n",
+	   g_mVehicleInfo.speed,g_mVehicleInfo.steeringangle,g_mVehicleInfo.steeringanglevalid,g_mVehicleInfo.leftturnon,g_mVehicleInfo.rightturnon,g_mVehicleInfo.frontwiperlevel,
+	   g_mVehicleInfo.headlightstatus,g_mVehicleInfo.ldwenabled,g_mVehicleInfo.fcwenabled,g_mVehicleInfo.ldwsensitivity,g_mVehicleInfo.fcwsensitivity,g_mVehicleInfo.breaklevel,
+	   g_mVehicleInfo.gearshift
+	  );
 	}
 	uartRelease();
 	return 0;

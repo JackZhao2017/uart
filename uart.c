@@ -197,7 +197,7 @@ static int readPost(char *buf ,int len)
 	sem_post(&g_sem_rx);
 	return 0;
 }
-int storagetoRingbuf(char *buf,int len)
+static int storagetoRingbuf(char *buf,int len)
 {
 	if((BUFSIZE-g_ringbufinfo.storageaddr)<len){
 		memcpy(&ringbuf[g_ringbufinfo.storageaddr],buf,BUFSIZE-g_ringbufinfo.storageaddr);
@@ -210,14 +210,11 @@ int storagetoRingbuf(char *buf,int len)
 		if(g_ringbufinfo.storageaddr==BUFSIZE)
 			g_ringbufinfo.storageaddr=0;
 	}
-	// g_ringbufinfo.canprocesslen=
-	// 	(g_ringbufinfo.storageaddr>g_ringbufinfo.processaddr)?
-	// 	(g_ringbufinfo.storageaddr-g_ringbufinfo.processaddr):(BUFSIZE-g_ringbufinfo.processaddr+g_ringbufinfo.storageaddr);
 	g_ringbufinfo.canstoragelen-=len;
 	g_ringbufinfo.canprocesslen+=len;
 	return 0;
 }
-int getfromRingbuf(char *buf,int len)
+static int getfromRingbuf(char *buf,int len)
 {
 	if(g_ringbufinfo.processaddr+len>BUFSIZE){
 		memcpy(buf,&ringbuf[g_ringbufinfo.processaddr],BUFSIZE-g_ringbufinfo.processaddr);
@@ -231,9 +228,8 @@ int getfromRingbuf(char *buf,int len)
 	}
 	g_ringbufinfo.canstoragelen+=len;
 	g_ringbufinfo.canprocesslen-=len;
-	printf("%d %d %d %d\n",g_ringbufinfo.processaddr,g_ringbufinfo.canprocesslen,g_ringbufinfo.storageaddr,g_ringbufinfo.canstoragelen);
 }
-int isprocessMessage()
+static int isprocessMessage()
 {
 	int i=0;
 	if(g_ringbufinfo.canprocesslen<MINSIZE)
@@ -243,7 +239,20 @@ int isprocessMessage()
 		int ind=i+g_ringbufinfo.processaddr;
 		if(ind>BUFSIZE-1)
 			ind-=BUFSIZE;
-		if(ringbuf[ind]=='t'){
+		
+		switch(ringbuf[ind])
+		{
+			case VEHICLESTATUS:
+
+				break;
+			case SYSCONTROL_RX:
+
+				break;
+			default:
+				break;
+		}
+
+		if(ringbuf[ind]==VEHICLESTATUS){
 			g_ringbufinfo.processaddr=ind;
 			g_ringbufinfo.canprocesslen-=i;
 			g_ringbufinfo.canstoragelen+=i;
@@ -252,12 +261,8 @@ int isprocessMessage()
 			return 1;
 		}
 	}
+	
 	return 0;
-}
-
-int processreadData(int size)
-{
-
 }
 
 static void *uartRead(void * threadParameter)
