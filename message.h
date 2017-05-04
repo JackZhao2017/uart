@@ -56,4 +56,8 @@ typedef struct {
 	int len;
 }BUFINFO;
 
+
+void getVehiclestatusInfo(VEHICLESTATUS_INFO *vehicleInfo);
+
+
 #endif
