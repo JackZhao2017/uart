@@ -7,11 +7,12 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 #include <string.h>
-
+#include <malloc.h>
 
 #include <pthread.h>
 #include <semaphore.h>
 
+#include "message.h"
 #include "uart.h" 
 
 #define DEFAULT_RATE 115200;
@@ -162,6 +163,18 @@ char *g_rxbuf=NULL;
 int  g_rxlen;
 int  g_isRxfinished=0;
 
+char *ringbuf=NULL;
+#define  BUFSIZE 256
+#define  MINSIZE 13
+typedef struct 
+{
+	int storageaddr;
+	int processaddr;
+	int canstoragelen;
+	int canprocesslen;
+}RINGBUF_INFO;
+RINGBUF_INFO g_ringbufinfo;
+
 int readdataComplete(int val)
 {
 	g_isRxfinished=TRUE;
@@ -182,25 +195,81 @@ static int readPost(char *buf ,int len)
 	sem_post(&g_sem_rx);
 	return 0;
 }
+int storagetoRingbuf(char *buf,int len)
+{
+	printf("%s\n",__func__ );
+	if((BUFSIZE-g_ringbufinfo.storageaddr)<len){
+		memcpy(&ringbuf[g_ringbufinfo.storageaddr],buf,BUFSIZE-g_ringbufinfo.storageaddr);
+		memcpy(ringbuf,&buf[BUFSIZE-g_ringbufinfo.storageaddr],len-BUFSIZE+g_ringbufinfo.storageaddr);
+		g_ringbufinfo.storageaddr=len-BUFSIZE+g_ringbufinfo.storageaddr;
+	}
+	else{
+		memcpy(&ringbuf[g_ringbufinfo.storageaddr],buf,len);
+		g_ringbufinfo.storageaddr+=len;
+	}
+	g_ringbufinfo.canprocesslen=
+		(g_ringbufinfo.storageaddr>g_ringbufinfo.processaddr)?
+		(g_ringbufinfo.storageaddr-g_ringbufinfo.processaddr):(BUFSIZE-g_ringbufinfo.processaddr+g_ringbufinfo.storageaddr);
+	return 0;
+}
+int getfromRingbuf(char *buf,int len)
+{
+	printf("%s\n",__func__);
+	if(g_ringbufinfo.processaddr+len>BUFSIZE){
+		memcpy(buf,&ringbuf[g_ringbufinfo.processaddr],BUFSIZE-g_ringbufinfo.processaddr);
+		memcpy(&buf[BUFSIZE-g_ringbufinfo.processaddr],ringbuf,len-BUFSIZE+g_ringbufinfo.processaddr);
+	}else{
+		memcpy(buf,&ringbuf[g_ringbufinfo.processaddr],len);
+	}
+	g_ringbufinfo.canstoragelen+=len;
+}
+int isprocessMessage()
+{
+	int i=0;
+	printf("%s\n",__func__ );
+	if(g_ringbufinfo.canprocesslen<MINSIZE)
+		return 0;
+	for(i=g_ringbufinfo.processaddr;i<g_ringbufinfo.processaddr+g_ringbufinfo.canprocesslen;i++)
+	{
+		int ind=i;
+		if(ind>BUFSIZE-1)
+			ind=i-BUFSIZE;
+		if(ringbuf[ind]==VEHICLESTATUS||ringbuf[ind]==SYSCONTROL_RX){
+			g_ringbufinfo.processaddr=ind;
+			g_ringbufinfo.canprocesslen=g_ringbufinfo.processaddr+g_ringbufinfo.canprocesslen-i;
+			if(g_ringbufinfo.canprocesslen<MINSIZE)//
+				return 0;
+			return 1;
+		}
+	}
+	return 0;
+}
+int processreadData(int size)
+{
 
+}
 static void *uartRead(void * threadParameter)
 {
-	char rx;
+	char *rx;
 	int iores, iocount=0;
 	printf("uartRead thread \n");
 	while(g_rrun) { 
 		iores = ioctl(g_fd_uart, FIONREAD, &iocount);
 		if(iocount){
          	rx = malloc(iocount);
-        	iores = read(g_fd_uart, &rx, iocount);
-        	readPost(&rx ,iocount);
-         	g_isRxfinished=FALSE;
-		 	free(rx);
+        	iores = read(g_fd_uart, rx, iocount);
+        	storagetoRingbuf(rx,iocount);
+        	free(rx);
+        	if(isprocessMessage()){
+
+        	}	 	
 		}
 	}
 	pthread_exit(NULL);
 }
-int iswriteBusy()
+
+
+int issendBusy()
 {
 	return g_isTxfinished;
 }
@@ -214,7 +283,7 @@ int uartsendData(char *buf ,int len)
 	sem_post(&g_sem_tx);
 	return 0;
 }
-static void *uartSend(void * threadParameter)
+static void *uartWrite(void * threadParameter)
 {
 	printf("uartSend thread \n");
 	while(g_trun)
@@ -226,6 +295,7 @@ static void *uartSend(void * threadParameter)
 	}
 	pthread_exit(NULL);
 }
+
 int uartInit(int argc ,char **argv)
 {
 	struct termios options;
@@ -298,13 +368,22 @@ int uartInit(int argc ,char **argv)
 
 	g_rrun = 1;
 	g_trun = 1;
+
+	ringbuf=(char *)malloc(BUFSIZE);
+	g_ringbufinfo.storageaddr=0;
+	g_ringbufinfo.processaddr=0;
+	g_ringbufinfo.canstoragelen=BUFSIZE;
+	g_ringbufinfo.canprocesslen=0;
+
+	
+
 	ret = pthread_create(&p_Uartread, NULL, uartRead, NULL);
 	if(ret<0)
 	{
 		printf("failed to create uart read thread \n");
 		return -1;
 	}
-	ret = pthread_create(&p_Uartsend, NULL, uartSend, NULL);
+	ret = pthread_create(&p_Uartsend, NULL, uartWrite, NULL);
 	if(ret<0)
 	{
 		printf("failed to create uart send thread \n");
@@ -321,6 +400,7 @@ void uartRelease()
 	int ret;
 	g_rrun = 0;
 	
+	free(ringbuf);
 	sem_post(&g_sem_rx);
 	ret = pthread_join(p_Uartread, NULL);
 	if(ret < 0)
