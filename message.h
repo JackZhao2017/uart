@@ -1,9 +1,10 @@
 #ifndef _MESSAGE_H_
 #define _MESSAGE_H_
 
-
+#define SYN_SIGN		0x55
 #define VEHICLESTATUS   0x30
 #define SYSCONTROL_RX   0x20
+
 
 #define SYSCONTROL_TX   0x21
 #define LDWSTATUS	    0x40

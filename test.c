@@ -13,7 +13,7 @@ void ctrl_c_handler(int signum, siginfo_t *info, void *myact)
 VEHICLESTATUS_INFO g_mVehicleInfo;
 int main(int argc ,char **argv)
 {
-	int count=0,ret,len=13;
+	int count=0,ret,len=7;
 	uartInit(argc,argv);
 	struct sigaction act;
 	sigemptyset(&act.sa_mask);
@@ -27,31 +27,32 @@ int main(int argc ,char **argv)
 	{
 		// char buf[125]={0};	
 		// memset(buf,0,sizeof(buf));		
-		char buf[]={0x30,0xd,0xc8,0x00,0x18,0x64,0x3d,0xef,0x1e,0x1,0x2,0x3,0x4};//
+		char buf[]={0x55,0x30,0x6,0x19,0x00,0xe0,0x3d};//
 		while(issendBusy()){
 			if(++count>3)
 				break;
 		}
+		len=sizeof(buf);
 		uartsendData(buf ,len);
 		sleep(1);
-		getVehiclestatusInfo(&g_mVehicleInfo);
-		printf("speed :            %f \n"\
-	   		   "steeringangle      %f \n"\
-	   			"steeringanglevalid %d \n"\
-	   			"leftturnon         %d \n"\
-	   			"rightturnon        %d \n"\
-	   			"frontwiperlevel    %d \n"\
-	   			"headlightstatus    %d \n"\
-	   			"ldwenabled         %d \n"\
-	   			"fcwenabled         %d \n"\
-	   			"ldwsensitivity     %d \n"\
-	   			"fcwsensitivity     %d \n"\
-	   			"breaklevel         %d \n"\
-	   			"gearshift          %d \n",
-	   g_mVehicleInfo.speed,g_mVehicleInfo.steeringangle,g_mVehicleInfo.steeringanglevalid,g_mVehicleInfo.leftturnon,g_mVehicleInfo.rightturnon,g_mVehicleInfo.frontwiperlevel,
-	   g_mVehicleInfo.headlightstatus,g_mVehicleInfo.ldwenabled,g_mVehicleInfo.fcwenabled,g_mVehicleInfo.ldwsensitivity,g_mVehicleInfo.fcwsensitivity,g_mVehicleInfo.breaklevel,
-	   g_mVehicleInfo.gearshift
-	  );
+		// getVehiclestatusInfo(&g_mVehicleInfo);
+		// printf("speed :            %f \n"\
+	 //   		   "steeringangle      %f \n"\
+	 //   			"steeringanglevalid %d \n"\
+	 //   			"leftturnon         %d \n"\
+	 //   			"rightturnon        %d \n"\
+	 //   			"frontwiperlevel    %d \n"\
+	 //   			"headlightstatus    %d \n"\
+	 //   			"ldwenabled         %d \n"\
+	 //   			"fcwenabled         %d \n"\
+	 //   			"ldwsensitivity     %d \n"\
+	 //   			"fcwsensitivity     %d \n"\
+	 //   			"breaklevel         %d \n"\
+	 //   			"gearshift          %d \n",
+	 //   g_mVehicleInfo.speed,g_mVehicleInfo.steeringangle,g_mVehicleInfo.steeringanglevalid,g_mVehicleInfo.leftturnon,g_mVehicleInfo.rightturnon,g_mVehicleInfo.frontwiperlevel,
+	 //   g_mVehicleInfo.headlightstatus,g_mVehicleInfo.ldwenabled,g_mVehicleInfo.fcwenabled,g_mVehicleInfo.ldwsensitivity,g_mVehicleInfo.fcwsensitivity,g_mVehicleInfo.breaklevel,
+	 //   g_mVehicleInfo.gearshift
+	 //  );
 	}
 	uartRelease();
 	return 0;

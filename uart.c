@@ -199,6 +199,7 @@ static int readPost(char *buf ,int len)
 }
 static int storagetoRingbuf(char *buf,int len)
 {
+
 	if((BUFSIZE-g_ringbufinfo.storageaddr)<len){
 		memcpy(&ringbuf[g_ringbufinfo.storageaddr],buf,BUFSIZE-g_ringbufinfo.storageaddr);
 		memcpy(ringbuf,&buf[BUFSIZE-g_ringbufinfo.storageaddr],len-BUFSIZE+g_ringbufinfo.storageaddr);
@@ -232,37 +233,60 @@ static int getfromRingbuf(char *buf,int len)
 static int isprocessMessage()
 {
 	int i=0;
-	if(g_ringbufinfo.canprocesslen<MINSIZE)
+	int retval=0;
+	int syn_flash=0;
+	int packet_flash=0;
+	int packetsize=0;
+	int detectsize=g_ringbufinfo.canprocesslen;
+	int startaddr =g_ringbufinfo.processaddr;
+	if(detectsize<3)
 		return 0;
-	for(i=0;i<g_ringbufinfo.canprocesslen;i++)
+	for(i=0;i<detectsize;i++)
 	{
-		int ind=i+g_ringbufinfo.processaddr;
+		int ind=i+startaddr;
+		g_ringbufinfo.canprocesslen-=1;
+		g_ringbufinfo.canstoragelen+=1;
 		if(ind>BUFSIZE-1)
 			ind-=BUFSIZE;
-		
-		switch(ringbuf[ind])
-		{
-			case VEHICLESTATUS:
 
-				break;
-			case SYSCONTROL_RX:
-
-				break;
-			default:
-				break;
+		if(ringbuf[ind]==SYN_SIGN){
+			syn_flash=1;
+			continue;
 		}
-
-		if(ringbuf[ind]==VEHICLESTATUS){
-			g_ringbufinfo.processaddr=ind;
-			g_ringbufinfo.canprocesslen-=i;
-			g_ringbufinfo.canstoragelen+=i;
-			if(g_ringbufinfo.canprocesslen<MINSIZE)//
-				return 0;
-			return 1;
+		if(syn_flash){
+			switch(ringbuf[ind])
+			{
+				case VEHICLESTATUS:				
+				case SYSCONTROL_RX:
+					 packet_flash=1;
+					 break;
+				default:
+					 packet_flash=0;
+					 break;
+			}
+			syn_flash=0;
+			if(packet_flash)
+				continue;
 		}
+		if(packet_flash){
+			packetsize=ringbuf[ind];
+			if(g_ringbufinfo.canprocesslen<packetsize-2){				
+				g_ringbufinfo.canprocesslen+=2;
+				g_ringbufinfo.canstoragelen-=2;
+				g_ringbufinfo.processaddr=ind-2;
+				retval=0;
+			}
+			else{
+				g_ringbufinfo.canprocesslen+=1;
+				g_ringbufinfo.canstoragelen-=1;
+				g_ringbufinfo.processaddr=ind-1;				
+				retval=1;
+			}
+			break;
+		}
+		g_ringbufinfo.processaddr=ind;			
 	}
-	
-	return 0;
+	return retval;
 }
 
 static void *uartRead(void * threadParameter)
@@ -278,11 +302,13 @@ static void *uartRead(void * threadParameter)
         	storagetoRingbuf(rx,iocount);
         	free(rx);
         	if(isprocessMessage()){
-        		rx=malloc(13);
-        		getfromRingbuf(rx,13);
-        		//printf("%s",rx);
-        		//printf("%d %d %d %d\n",g_ringbufinfo.processaddr,g_ringbufinfo.canprocesslen,g_ringbufinfo.storageaddr,g_ringbufinfo.canstoragelen);
-        		message_resolver(rx);
+        		rx=malloc(6);
+        		getfromRingbuf(rx,6);
+        		for(iocount=0;iocount<6;iocount++)
+        		printf("0x%x ",rx[iocount]);
+        		printf("\n");
+        		printf("%d %d %d %d\n",g_ringbufinfo.processaddr,g_ringbufinfo.canprocesslen,g_ringbufinfo.storageaddr,g_ringbufinfo.canstoragelen);
+        		//message_resolver(rx);
         		free(rx);
         	}	 	
 		}

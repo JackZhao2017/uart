@@ -151,6 +151,8 @@ int message_resolver(char *message)
 }
 
 
+
+
 void ldw_messagecreator(LDW_OUTINFO info,BUFINFO bufinfo)
 {
 	unsigned short temp=0,i;
