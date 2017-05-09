@@ -230,7 +230,7 @@ static int getfromRingbuf(char *buf,int len)
 	g_ringbufinfo.canstoragelen+=len;
 	g_ringbufinfo.canprocesslen-=len;
 }
-static int isprocessMessage()
+static int isprocessMessage(int *size)
 {
 	int i=0;
 	int retval=0;
@@ -239,7 +239,7 @@ static int isprocessMessage()
 	int packetsize=0;
 	int detectsize=g_ringbufinfo.canprocesslen;
 	int startaddr =g_ringbufinfo.processaddr;
-	if(detectsize<3)
+	if(detectsize<6)
 		return 0;
 	for(i=0;i<detectsize;i++)
 	{
@@ -279,7 +279,8 @@ static int isprocessMessage()
 			else{
 				g_ringbufinfo.canprocesslen+=1;
 				g_ringbufinfo.canstoragelen-=1;
-				g_ringbufinfo.processaddr=ind-1;				
+				g_ringbufinfo.processaddr=ind-1;
+				*size = packetsize;				
 				retval=1;
 			}
 			break;
@@ -292,7 +293,7 @@ static int isprocessMessage()
 static void *uartRead(void * threadParameter)
 {
 	char *rx;
-	int iores, iocount=0;
+	int iores, iocount=0,len=0;
 	printf("uartRead thread \n");
 	while(g_rrun) { 
 		iores = ioctl(g_fd_uart, FIONREAD, &iocount);
@@ -301,14 +302,14 @@ static void *uartRead(void * threadParameter)
         	iores = read(g_fd_uart, rx, iocount);
         	storagetoRingbuf(rx,iocount);
         	free(rx);
-        	if(isprocessMessage()){
-        		rx=malloc(6);
-        		getfromRingbuf(rx,6);
-        		for(iocount=0;iocount<6;iocount++)
-        		printf("0x%x ",rx[iocount]);
-        		printf("\n");
-        		printf("%d %d %d %d\n",g_ringbufinfo.processaddr,g_ringbufinfo.canprocesslen,g_ringbufinfo.storageaddr,g_ringbufinfo.canstoragelen);
-        		//message_resolver(rx);
+        	if(isprocessMessage(&len)){
+        		rx=malloc(len);
+        		getfromRingbuf(rx,len);
+        		for(iocount=0;iocount<len;iocount++)
+        		   // printf("0x%x ",rx[iocount]);
+        		   // printf("\n");
+        		// printf("%d %d %d %d\n",g_ringbufinfo.processaddr,g_ringbufinfo.canprocesslen,g_ringbufinfo.storageaddr,g_ringbufinfo.canstoragelen);
+        		message_resolver(rx);
         		free(rx);
         	}	 	
 		}
