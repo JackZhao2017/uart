@@ -24,14 +24,18 @@
  * table:	table to be filled.
  * polynomial:	polynomial for which table is to be filled.
  */
-
+void crcInit(int type, int poly);
 static unsigned char  crc_table[CRC8_TABLE_SIZE];
-
+int istableInit=0;
 void crc8_populate_msb(u8 table[CRC8_TABLE_SIZE], u8 polynomial)
 {
 	int i, j;
 	const u8 msbit = 0x80;
 	u8 t = msbit;
+	if(!istableInit){
+		istableInit=1;
+		crcInit(LSB,POLY);
+	}
 
 	table[0] = 0;
 
@@ -53,7 +57,10 @@ void crc8_populate_lsb(u8 table[CRC8_TABLE_SIZE], u8 polynomial)
 {
 	int i, j;
 	u8 t = 1;
-
+	if(!istableInit){
+		istableInit=1;
+		crcInit(LSB,POLY);
+	}
 	table[0] = 0;
 
 	for (i = (CRC8_TABLE_SIZE >> 1); i; i >>= 1) {
