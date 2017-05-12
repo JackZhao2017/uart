@@ -70,9 +70,12 @@ typedef struct {
 	int len;
 }BUFINFO;
 
+void message_creator(WARNNIG_CENTER center,int m,BUFINFO bufinfo);
 
 void getVehiclestatusInfo(VEHICLESTATUS_INFO *vehicleInfo);
-int  getCommd(int *cmd);
+
+int  getCommand(int *cmd);
+void cleanCommand(void);
 
 
 #endif

@@ -149,7 +149,7 @@ static speed_t baudrate_map(unsigned long b)
 
 #define TRUE  1
 #define FALSE 0
-char 		*g_uartDev="/dev/ttymxc4";
+char 		*g_uartDev="/dev/ttymxc2";
 int  		g_fd_uart=0;
 pthread_t 	p_Uartsend, p_Uartread;
 int 		g_rrun ,g_trun;
@@ -158,10 +158,10 @@ sem_t 		g_sem_tx,g_sem_rx;
 
 char *g_txbuf=NULL;
 int  g_txlen;
-int  g_isTxfinished=0;
+int  g_isTxfinished=FALSE;
 char *g_rxbuf=NULL;
 int  g_rxlen;
-int  g_isRxfinished=0;
+int  g_isRxfinished=FALSE;
 
 char *ringbuf=NULL;
 #define  BUFSIZE 256
@@ -199,7 +199,7 @@ static int readPost(char *buf ,int len)
 }
 static int storagetoRingbuf(char *buf,int len)
 {
-
+	printf("%s\n",buf);
 	if((BUFSIZE-g_ringbufinfo.storageaddr)<len){
 		memcpy(&ringbuf[g_ringbufinfo.storageaddr],buf,BUFSIZE-g_ringbufinfo.storageaddr);
 		memcpy(ringbuf,&buf[BUFSIZE-g_ringbufinfo.storageaddr],len-BUFSIZE+g_ringbufinfo.storageaddr);
@@ -293,10 +293,14 @@ static int isprocessMessage(int *size)
 static void *uartRead(void * threadParameter)
 {
 	char *rx;
-	int iores, iocount=0,len=0;
+	int iores, iocount=1,len=0;
+	int old =0;
 	printf("uartRead thread \n");
 	while(g_rrun) { 
 		iores = ioctl(g_fd_uart, FIONREAD, &iocount);
+		if(iocount!=old)
+		printf("%s iocount %d\n",__func__,iocount);
+		old=iocount;
 		if(iocount){
          	rx = malloc(iocount);
         	iores = read(g_fd_uart, rx, iocount);
@@ -306,9 +310,9 @@ static void *uartRead(void * threadParameter)
         		rx=malloc(len);
         		getfromRingbuf(rx,len);
         		for(iocount=0;iocount<len;iocount++)
-        		   // printf("0x%x ",rx[iocount]);
-        		   // printf("\n");
-        		// printf("%d %d %d %d\n",g_ringbufinfo.processaddr,g_ringbufinfo.canprocesslen,g_ringbufinfo.storageaddr,g_ringbufinfo.canstoragelen);
+        		   printf("0x%x ",rx[iocount]);
+        		   printf("\n");
+
         		message_resolver(rx);
         		free(rx);
         	}	 	
@@ -340,9 +344,9 @@ static void *uartWrite(void * threadParameter)
 	while(g_trun)
 	{
 		sem_wait(&g_sem_tx);
-		g_isTxfinished=TRUE;
-		write(g_fd_uart,g_txbuf,g_txlen);
 		g_isTxfinished=FALSE;
+		write(g_fd_uart,g_txbuf,g_txlen);
+		g_isTxfinished=TRUE;
 	}
 	pthread_exit(NULL);
 }
@@ -353,7 +357,8 @@ int uartInit(int argc ,char **argv)
 	unsigned long baudrate = DEFAULT_RATE;
 	int ret,i;
 
-	g_fd_uart = open(g_uartDev, O_RDWR | O_NOCTTY);
+	printf("%s argc %d   %s\n",__func__,argc,g_uartDev);
+	 g_fd_uart = open(g_uartDev, O_RDWR | O_NOCTTY);
 	if (g_fd_uart == -1) {
 		printf("open_port: Unable to open serial port - %s", g_uartDev);
 		return -1;
@@ -362,12 +367,12 @@ int uartInit(int argc ,char **argv)
 	tcgetattr(g_fd_uart, &options);
 
 	options.c_cflag &= ~CSTOPB;
+
 	options.c_cflag &= ~CSIZE;
 	options.c_cflag |= PARENB;
 	options.c_cflag &= ~PARODD;
 	options.c_cflag |= CS8;
 	options.c_cflag &= ~CRTSCTS;
-	//options.c_cflag |= CRTSCTS;
 
 	options.c_lflag &= ~(ICANON | IEXTEN | ISIG | ECHO| ECHONL);
 	options.c_oflag &= ~OPOST;
@@ -377,7 +382,7 @@ int uartInit(int argc ,char **argv)
 	options.c_cc[VTIME] = 0;
 	options.c_cflag |= (CLOCAL | CREAD);
 
-	for(i = 2; i < argc; i++) {
+	for(i = 1; i < argc; i++) {
 		
 		if (!strcmp(argv[i], "-S")) {
 			options.c_cflag |= CSTOPB;

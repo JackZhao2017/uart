@@ -22,7 +22,9 @@ void getVehiclestatusInfo(VEHICLESTATUS_INFO *vehicleInfo)
 void vehiclestatus_caculate(int *val)
 {
 	VEHICLESTATUS_INFO vehicle_info;
-	vehicle_info.speed=val[0]*SPEED_CONEFFICIENT;
+	
+	vehicle_info.speed=(float)(val[0]*SPEED_CONEFFICIENT);
+	printf("%s  spped %f\n",__func__,vehicle_info.speed);
 	vehicle_info.headlightstatus=val[1];
 	vehicle_info.ldwenabled=val[2];
 	vehicle_info.fcwenabled=val[3];
@@ -62,17 +64,20 @@ void getbit(char *m,int *byte,int *bit,int num,int *val)
 void vehiclestatus_resolver(char *message)
 {
 	int i=0;	
+	int t=0;
 	int val[VEHICLESTATUS_VALID]={0};
-	// printf("%s :\n",__func__);
 	memset(val,0,sizeof(val));
-	val[0]=message[2]<<8+message[3];
+	val[0]=(message[2]<<8)+message[3];
 	val[1]=(message[4]&0x80)?1:0;
 	val[2]=(message[4]&0x40)?1:0;
 	val[3]=(message[4]&0x20)?1:0;
 	vehiclestatus_caculate(val);
 }
-
-int  getCommd(int *cmd)
+void cleanCommand(void)
+{
+	memset(&g_sysctrl_rx,0,sizeof(g_sysctrl_rx));
+}
+int  getCommand(int *cmd)
 {
 	*cmd=g_sysctrl_rx.Commad;
 	return g_sysctrl_rx.Seqnum;
@@ -214,17 +219,19 @@ void syscontrol_cmd_creator(SYS_CTRLINFO info,BUFINFO bufinfo)
 	memcpy(bufinfo.addr,message,bufinfo.len);
 	free(message);
 }
-vehicle_messagecreator(VEHICLESTATUS_INFO info,BUFINFO bufinfo)
+void vehicle_messagecreator(VEHICLESTATUS_INFO info,BUFINFO bufinfo)
 {
 	char *message=NULL;
 	int temp=0;
+	float ftemp=0;
 	message=malloc(bufinfo.len);
 	memset(message,0,bufinfo.len);
 
 	message[0]=SYN_SIGN;
 	message[1]=VEHICLESTATUS;
 	message[2]=bufinfo.len-1;
-	temp=info.speed/SPEED_CONEFFICIENT;
+	ftemp=info.speed/SPEED_CONEFFICIENT;
+	temp=(int)(ftemp);
 	message[3]=(temp>>8)&0xff;
 	message[4]=temp&0xff;
 	message[5]=(info.headlightstatus?0x80:0x00)|(info.ldwenabled?0x40:0x00)|(info.fcwenabled?0x20:0x00);
