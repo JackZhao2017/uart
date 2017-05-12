@@ -30,7 +30,7 @@ int main(int argc ,char **argv)
 			printf("install sigal error\n");
 			return -1;
 	}
-	if(capture_timeinit(10)<0)
+	if(capture_timeinit(2)<0)
     {
           printf("<%s>:capture timer initialize failed \n",__func__);
           return -1;

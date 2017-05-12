@@ -199,7 +199,8 @@ static int readPost(char *buf ,int len)
 }
 static int storagetoRingbuf(char *buf,int len)
 {
-	printf("%s\n",buf);
+	int i=0;
+	// printf("<%s>:%d %d %d %d len :%d \n",__func__,g_ringbufinfo.processaddr,g_ringbufinfo.canprocesslen,g_ringbufinfo.storageaddr,g_ringbufinfo.canstoragelen,len); 
 	if((BUFSIZE-g_ringbufinfo.storageaddr)<len){
 		memcpy(&ringbuf[g_ringbufinfo.storageaddr],buf,BUFSIZE-g_ringbufinfo.storageaddr);
 		memcpy(ringbuf,&buf[BUFSIZE-g_ringbufinfo.storageaddr],len-BUFSIZE+g_ringbufinfo.storageaddr);
@@ -213,10 +214,12 @@ static int storagetoRingbuf(char *buf,int len)
 	}
 	g_ringbufinfo.canstoragelen-=len;
 	g_ringbufinfo.canprocesslen+=len;
+	// printf("\n<%s>:%d %d %d %d \n",__func__,g_ringbufinfo.processaddr,g_ringbufinfo.canprocesslen,g_ringbufinfo.storageaddr,g_ringbufinfo.canstoragelen); 
 	return 0;
 }
 static int getfromRingbuf(char *buf,int len)
 {
+	// printf("<%s>:%d %d %d %d len :%d \n",__func__,g_ringbufinfo.processaddr,g_ringbufinfo.canprocesslen,g_ringbufinfo.storageaddr,g_ringbufinfo.canstoragelen,len);
 	if(g_ringbufinfo.processaddr+len>BUFSIZE){
 		memcpy(buf,&ringbuf[g_ringbufinfo.processaddr],BUFSIZE-g_ringbufinfo.processaddr);
 		memcpy(&buf[BUFSIZE-g_ringbufinfo.processaddr],ringbuf,len-BUFSIZE+g_ringbufinfo.processaddr);
@@ -229,6 +232,8 @@ static int getfromRingbuf(char *buf,int len)
 	}
 	g_ringbufinfo.canstoragelen+=len;
 	g_ringbufinfo.canprocesslen-=len;
+	// printf("<%s>:%d %d %d %d\n",__func__,g_ringbufinfo.processaddr,g_ringbufinfo.canprocesslen,g_ringbufinfo.storageaddr,g_ringbufinfo.canstoragelen); 
+
 }
 static int isprocessMessage(int *size)
 {
@@ -239,7 +244,7 @@ static int isprocessMessage(int *size)
 	int packetsize=0;
 	int detectsize=g_ringbufinfo.canprocesslen;
 	int startaddr =g_ringbufinfo.processaddr;
-	if(detectsize<6)
+	if(detectsize<7)
 		return 0;
 	for(i=0;i<detectsize;i++)
 	{
@@ -248,7 +253,7 @@ static int isprocessMessage(int *size)
 		g_ringbufinfo.canstoragelen+=1;
 		if(ind>BUFSIZE-1)
 			ind-=BUFSIZE;
-
+		g_ringbufinfo.processaddr=ind;	
 		if(ringbuf[ind]==SYN_SIGN){
 			syn_flash=1;
 			continue;
@@ -271,21 +276,21 @@ static int isprocessMessage(int *size)
 		if(packet_flash){
 			packetsize=ringbuf[ind];
 			if(g_ringbufinfo.canprocesslen<packetsize-2){				
-				g_ringbufinfo.canprocesslen+=2;
-				g_ringbufinfo.canstoragelen-=2;
+				g_ringbufinfo.canprocesslen+=3;
+				g_ringbufinfo.canstoragelen-=3;
 				g_ringbufinfo.processaddr=ind-2;
 				retval=0;
 			}
 			else{
-				g_ringbufinfo.canprocesslen+=1;
-				g_ringbufinfo.canstoragelen-=1;
+				g_ringbufinfo.canprocesslen+=2;
+				g_ringbufinfo.canstoragelen-=2;
 				g_ringbufinfo.processaddr=ind-1;
 				*size = packetsize;				
 				retval=1;
 			}
 			break;
 		}
-		g_ringbufinfo.processaddr=ind;			
+		
 	}
 	return retval;
 }
@@ -294,13 +299,9 @@ static void *uartRead(void * threadParameter)
 {
 	char *rx;
 	int iores, iocount=1,len=0;
-	int old =0;
 	printf("uartRead thread \n");
 	while(g_rrun) { 
 		iores = ioctl(g_fd_uart, FIONREAD, &iocount);
-		if(iocount!=old)
-		printf("%s iocount %d\n",__func__,iocount);
-		old=iocount;
 		if(iocount){
          	rx = malloc(iocount);
         	iores = read(g_fd_uart, rx, iocount);
@@ -312,7 +313,7 @@ static void *uartRead(void * threadParameter)
         		for(iocount=0;iocount<len;iocount++)
         		   printf("0x%x ",rx[iocount]);
         		   printf("\n");
-
+        		// printf("%d %d %d %d\n",g_ringbufinfo.processaddr,g_ringbufinfo.canprocesslen,g_ringbufinfo.storageaddr,g_ringbufinfo.canstoragelen);   
         		message_resolver(rx);
         		free(rx);
         	}	 	
