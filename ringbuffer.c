@@ -48,6 +48,10 @@ int getdatafromBuffer(RINGBUFFER *info,char *buf,int len)
 	info->num-=len;
 	return 0;
 }
+int addringaddr(int addr)
+{
+	return ((addr+1)<RINGBUFSIZE)?addr+1:0;
+}
 int isprocessMsg(RINGBUFFER *info,int *len)
 {
 	if(info->num<7)
