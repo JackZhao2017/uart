@@ -18,6 +18,7 @@ typedef struct{
 int ringbufferInit(RINGBUFFER *info,int size);
 int putdatatoBuffer(RINGBUFFER *info,char *buf,int len);
 int getdatafromBuffer(RINGBUFFER *info,char *buf,int len);
+int addringaddr(int addr);
 int isprocessMsg(RINGBUFFER *info,int *len);
 
 
