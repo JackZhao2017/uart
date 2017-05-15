@@ -1,4 +1,5 @@
 #include "ringbuffer.h"
+#include "message.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,7 +22,7 @@ int ringbufferInit(RINGBUFFER *info,int size)
 	info->size=size;
 }
 
-int putdatatoBuffer(RINGBUFFER *info,char *buf,int len)
+int putdatatoBuffer(RINGBUFFER *info,u8 *buf,int len)
 {
 	if(len<=0||len>info->size-info->num)
 		return -1;
@@ -37,7 +38,7 @@ int putdatatoBuffer(RINGBUFFER *info,char *buf,int len)
 	return 0;
 }
 
-int getdatafromBuffer(RINGBUFFER *info,char *buf,int len)
+int getdatafromBuffer(RINGBUFFER *info,u8 *buf,int len)
 {
 	if(len>info->num||len<=0)
 		return -1;
@@ -53,34 +54,51 @@ int getdatafromBuffer(RINGBUFFER *info,char *buf,int len)
 	return 0;
 }
 
-int addringaddr(int addr)
+int addringaddr(RINGBUFFER *info)
 {
+	int addr=info->getaddr;
+	info->num-=1;
 	return ((addr+1)<RINGBUFSIZE)?addr+1:0;
 }
 int detectSync(RINGBUFFER *info,u8 sync)
 {
+	int val=0;
 	show_ringbufferinfo(info);
 	if(info->num<=0)
 		return 0;
 	while(info->num>0){
 		if(info->data[info->getaddr]==sync){
-			return 1;
+			val=1;
+			break;
 		}
-		info->getaddr=addringaddr(info->getaddr);
-		info->num-=1;
+		info->getaddr=addringaddr(info);
 	}
 	show_ringbufferinfo(info);
-	return 0;
+	return val;
 }
-int isprocessMsg(RINGBUFFER *info,int *len)
+int detectMsginfo(RINGBUFFER *info,int *len)
 {
-	if(info->num<7)
+	int id =0,val=0;
+	show_ringbufferinfo(info);
+	if(info->num<3)
 		return 0;
-	
-	
-	return 	1;
+	info->getaddr=addringaddr(info);
+	id=info->data[info->getaddr];
+	switch(id){
+		case VEHICLESTATUS:				
+		case SYSCONTROL_RX:
+			 val=id;
+			 break;
+		default:
+		     val=0;
+			 break;
+	}
+	*len=info->data[info->getaddr+1];
+	if(info->num+1<*len)
+		val=0;
+	show_ringbufferinfo(info);
+	return  val;
 }
-
 
 
 

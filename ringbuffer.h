@@ -17,10 +17,11 @@ typedef struct{
 }RINGBUFFER;
 
 int ringbufferInit(RINGBUFFER *info,int size);
-int putdatatoBuffer(RINGBUFFER *info,char *buf,int len);
-int getdatafromBuffer(RINGBUFFER *info,char *buf,int len);
-int addringaddr(int addr);
+int putdatatoBuffer(RINGBUFFER *info,u8 *buf,int len);
+int getdatafromBuffer(RINGBUFFER *info,u8 *buf,int len);
+int addringaddr(RINGBUFFER *info);
 int detectSync(RINGBUFFER *info,u8 sync);
+int detectMsginfo(RINGBUFFER *info,int *len);
 void show_ringbufferinfo(RINGBUFFER *info);
 int isprocessMsg(RINGBUFFER *info,int *len);
 

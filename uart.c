@@ -90,85 +90,34 @@ int readdataComplete(int val)
 	return g_isRxfinished;
 }
 
-static int isprocessMessage(int *size)
-{
-	int i=0;
-	int retval=0;
-	int syn_flash=0;
-	int packet_flash=0;
-	int packetsize=0;
-	int detectsize=g_ringbufInfo.num;
-	int startaddr =g_ringbufInfo.getaddr;
-	show_ringbufferinfo(&g_ringbufInfo);
-	if(detectsize<7)
-		return 0;
-	for(i=0;i<detectsize;i++)
-	{
-		int ind=i+startaddr;
-		g_ringbufInfo.num-=1;
-		if(ind>RINGBUFSIZE-1)
-			ind-=RINGBUFSIZE;
-		g_ringbufInfo.getaddr=ind;	
-		if(g_ringbufInfo.data[ind]==SYN_SIGN){
-			syn_flash=1;
-			continue;
-		}
-		if(syn_flash){
-			switch(g_ringbufInfo.data[ind])
-			{
-				case VEHICLESTATUS:				
-				case SYSCONTROL_RX:
-					 packet_flash=1;
-					 break;
-				default:
-					 packet_flash=0;
-					 break;
-			}
-			syn_flash=0;
-			if(packet_flash)
-				continue;
-		}
-		if(packet_flash){
-			packetsize=g_ringbufInfo.data[ind];
-			if(g_ringbufInfo.num<packetsize-2){				
-				g_ringbufInfo.num+=3;
-				g_ringbufInfo.getaddr=ind-2;
-				retval=0;
-			}
-			else{
-				g_ringbufInfo.num+=2;
-				g_ringbufInfo.getaddr=ind-1;
-				*size = packetsize;				
-				retval=1;
-			}
-			break;
-		}
-		
-	}
-	show_ringbufferinfo(&g_ringbufInfo);
-	return retval;
-}
+
 
 static void *uartRead(void * threadParameter)
 {
 	u8 data[RINGBUFSIZE];
 	int iores, iocount=0,len=0,isSync=0;
-	int old =0;
+	int i =0;
 	printf("uartRead thread \n");
 	while(g_rrun) { 
 		iores = ioctl(g_fd_uart, FIONREAD, &iocount);
 		if(iocount){
 			memset(data,0,sizeof(data));
         	iores = read(g_fd_uart, data, iocount);
-        	printf("iocount %d \n",iocount );
+        	for(i=0;i<iocount;i++)
+        		   	printf("0x%x ",data[i]);
+        	printf("\n");
         	putdatatoBuffer(&g_ringbufInfo,data,iocount);
-        	if(isprocessMessage(&len)){
- 				memset(data,0,sizeof(data));
-        		getdatafromBuffer(&g_ringbufInfo,data,len);
-        		for(iocount=0;iocount<len;iocount++)
-        		   printf("0x%x ",data[iocount]);
-        		   printf("\n");
-        		message_resolver(data);
+        	if(!isSync)
+        		isSync=detectSync(&g_ringbufInfo,SYN_SIGN);
+        	if(isSync){
+        		if(detectMsginfo(&g_ringbufInfo,&len)){
+        			getdatafromBuffer(&g_ringbufInfo,data,len);
+        			for(i=0;i<len;i++)
+        		   	printf("0x%x ",data[i]);
+        		   	printf("\n");
+        			message_resolver(data);
+        			isSync=0;
+        		}
         	}	 	
 		}
 	}
