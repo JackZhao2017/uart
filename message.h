@@ -54,11 +54,19 @@ typedef struct FCW_INFO
 }FCW_OUTINFO;
 
 typedef struct {
-	int Seqnum;
-	int Commad;
-	int datalen;
-	char *data;
+	u8 flag;
+	u8 Seqnum;
+	u8 Commad;
+	u8 datalen;
+	u8 *data;	
 }SYS_CTRLINFO;
+typedef struct 
+{
+	u8 	Seqnum;
+	u8  Response;
+	u8  datalen;
+	u8  *data;
+}SYS_RESPONSE;
 
 typedef struct 
 {
@@ -74,9 +82,7 @@ typedef struct {
 }BUFINFO;
 
 void message_creator(WARNNIG_CENTER center,int m,BUFINFO bufinfo);
-
 void getVehiclestatusInfo(VEHICLESTATUS_INFO *vehicleInfo);
-
 int  getCommand(int *cmd);
 void cleanCommand(void);
 

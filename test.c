@@ -45,24 +45,22 @@ int main(int argc ,char **argv)
 
 		BUFINFO bufinfo;
 		bufinfo.len=sizeof(buf);
-		bufinfo.addr=malloc(bufinfo.len);
+		bufinfo.addr=&buf[0];
 		if(speed==360)
 			speed=1;
 		center.vehicle_info.speed=speed;
-		printf("speed %f \n",speed++);
-		center.vehicle_info.headlightstatus=1;
+		printf("\n%s speed %f \n",__func__,speed++);
+		center.vehicle_info.headlightstatus=4;
 		center.vehicle_info.ldwenabled=1;
-		center.vehicle_info.fcwenabled=0;
+		center.vehicle_info.fcwenabled=1;
 		message_creator(center,VEHICLESTATUS,bufinfo);
 		uartsendData(bufinfo.addr ,bufinfo.len);
-		free(bufinfo.addr);
+
 		
-
-
 		getVehiclestatusInfo(&g_mVehicleInfo);
 		seqnum=getCommand(&commad);
 		cleanCommand();
-
+		if(g_mVehicleInfo.ldwenabled)
 			printf("\nspeed :            %f \n"	   		   
 	   			"headlightstatus    %d \n"
 	   			"ldwenabled         %d \n"

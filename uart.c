@@ -78,24 +78,13 @@ sem_t 		g_sem_tx,g_sem_rx;
 char *g_txbuf=NULL;
 int  g_txlen;
 int  g_isTxfinished=FALSE;
-char *g_rxbuf=NULL;
-int  g_rxlen;
-int  g_isRxfinished=FALSE;
 
 RINGBUFFER g_ringbufInfo;
-
-int readdataComplete(int val)
-{
-	g_isRxfinished=TRUE;
-	return g_isRxfinished;
-}
-
-
 
 static void *uartRead(void * threadParameter)
 {
 	u8 data[RINGBUFSIZE];
-	int iores, iocount=0,len=0,isSync=0;
+	int iores, iocount=0,len=0,isSync=0,retval=0;
 	int i =0;
 	printf("uartRead thread \n");
 	while(g_rrun) { 
@@ -115,7 +104,7 @@ static void *uartRead(void * threadParameter)
         			for(i=0;i<len;i++)
         		   	printf("0x%x ",data[i]);
         		   	printf("\n");
-        			message_resolver(data);
+        			retval=message_resolver(data);
         			isSync=0;
         		}
         	}	 	

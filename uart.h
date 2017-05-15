@@ -5,7 +5,6 @@ int  uartInit(int argc ,char **argv);
 int  issendBusy(void);
 int  readdataComplete(int val);
 int  uartsendData(char *buf ,int len);
-int  getuartData(char **buf,int *len);
 void uartRelease(void);
 
 #endif

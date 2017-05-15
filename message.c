@@ -12,7 +12,7 @@ typedef struct{
 }POSITION;
 
 VEHICLESTATUS_INFO g_vehicleInfo;
-SYS_CTRLINFO 	   g_sysctrl_rx;
+SYS_CTRLINFO 	   g_sysctrl_rx[256];
 
 
 void getVehiclestatusInfo(VEHICLESTATUS_INFO *vehicleInfo)
@@ -20,7 +20,7 @@ void getVehiclestatusInfo(VEHICLESTATUS_INFO *vehicleInfo)
 	memcpy(vehicleInfo,&g_vehicleInfo,sizeof(VEHICLESTATUS_INFO));
 }
 
-void vehiclestatus_caculate(u16 *val)
+static void vehiclestatus_caculate(u16 *val)
 {
 	VEHICLESTATUS_INFO vehicle_info;
 	
@@ -32,46 +32,16 @@ void vehiclestatus_caculate(u16 *val)
 	memcpy(&g_vehicleInfo,&vehicle_info,sizeof(VEHICLESTATUS_INFO));
 }
 
-void getbit(u8 *m,int *byte,int *bit,int num,int *val)
-{
-	int ch=0;
-	int b =0;
-	int i=0;
-	int temp=0;
-	u8 data=(0x80>>b);
-	ch=*byte;
-	b =*bit;
-	printf("%s  %d \n",__func__,ch);
-	for(i=0;i<num;i++)
-	{
-		if(m[ch]&data)
-			temp=(temp|0x1)<<1;
-		else
-			temp=temp<<1;
-		data>>=1;
-		printf("%x \n",temp);
-		if(data==0){
-			data=0x80;
-			ch+=1;
-		}
-	}
-	*val=temp;
-	*byte=ch;
-	*bit=b+num-1;
-	if(*bit>7)
-		*bit-=7;
-}
-
-void vehiclestatus_resolver(u8 *message)
+static void vehiclestatus_resolver(u8 *message)
 {
 	int i=0;	
 	int t=0;
 	unsigned short val[VEHICLESTATUS_VALID]={0};
 	memset(val,0,sizeof(val));
 	val[0]=((message[2]<<8)+message[3]);
-	val[1]=(message[4]&0x80)?1:0;
-	val[2]=(message[4]&0x40)?1:0;
-	val[3]=(message[4]&0x20)?1:0;
+	val[1]=(message[4]&0xf0)>>4;
+	val[2]=(message[4]&0x08)?1:0;
+	val[3]=(message[4]&0x04)?1:0;
 	vehiclestatus_caculate(val);
 }
 void cleanCommand(void)
@@ -84,7 +54,8 @@ int  getCommand(int *cmd)
 	return g_sysctrl_rx.Seqnum;
 }
 
-void syscontrol_rx_resolver(u8 *message)
+
+static void syscontrol_rx_resolver(u8 *message)
 {
 	memset(&g_sysctrl_rx,0,sizeof(g_sysctrl_rx));
 
@@ -97,7 +68,7 @@ void syscontrol_rx_resolver(u8 *message)
 	}
 }
 
-int crc8_detect(u8 *message)
+static int crc8_detect(u8 *message)
 {
 	int packetsize=message[1];
 	int crc=0;
@@ -132,7 +103,7 @@ int message_resolver(u8 *message)
 	 return retval;
 }
 
-int crc8_creator(u8 *m,int start,int len)
+static int crc8_creator(u8 *m,int start,int len)
 {
 	u8 crc=0;
 	crc=crc8(&m[start],len, 0);
@@ -141,7 +112,7 @@ int crc8_creator(u8 *m,int start,int len)
 }
 
 
-void ldw_messagecreator(LDW_OUTINFO info,BUFINFO bufinfo)
+static void ldw_messagecreator(LDW_OUTINFO info,BUFINFO bufinfo)
 {
 	u16 temp=0,i;
 	u8 message[LDW_MESSAGESIZE];
@@ -170,7 +141,7 @@ void ldw_messagecreator(LDW_OUTINFO info,BUFINFO bufinfo)
 	// free(message);
 }
 
-void fcw_messagecreator(FCW_OUTINFO info,BUFINFO bufinfo)
+static void fcw_messagecreator(FCW_OUTINFO info,BUFINFO bufinfo)
 {	
 	int temp=0,i;
 	// u8 *message=NULL;
@@ -201,7 +172,7 @@ void fcw_messagecreator(FCW_OUTINFO info,BUFINFO bufinfo)
 
 	// free(message);
 }
-void syscontrol_cmd_creator(SYS_CTRLINFO info,BUFINFO bufinfo)
+static void syscontrol_cmd_creator(SYS_CTRLINFO info,BUFINFO bufinfo)
 {
 	u8 *message=NULL;
 	message=malloc(bufinfo.len);
@@ -220,7 +191,7 @@ void syscontrol_cmd_creator(SYS_CTRLINFO info,BUFINFO bufinfo)
 	memcpy(bufinfo.addr,message,bufinfo.len);
 	free(message);
 }
-void vehicle_messagecreator(VEHICLESTATUS_INFO info,BUFINFO bufinfo)
+static void vehicle_messagecreator(VEHICLESTATUS_INFO info,BUFINFO bufinfo)
 {
 	u8 *message=NULL;
 	u16 temp=0;
@@ -237,7 +208,7 @@ void vehicle_messagecreator(VEHICLESTATUS_INFO info,BUFINFO bufinfo)
 	message[3]=(temp>>8)&0xff;
 
 	message[4]=temp&0xff;
-	message[5]=(info.headlightstatus?0x80:0x00)|(info.ldwenabled?0x40:0x00)|(info.fcwenabled?0x20:0x00);
+	message[5]=((info.headlightstatus<<4)&0xf0)|(info.ldwenabled?0x08:0x00)|(info.fcwenabled?0x04:0x00);
 	message[6]=crc8_creator(message,1,5);
 	memcpy(bufinfo.addr,message,bufinfo.len);
 	
