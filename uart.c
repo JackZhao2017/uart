@@ -13,7 +13,8 @@
 #include <semaphore.h>
 
 #include "message.h"
-#include "uart.h" 
+#include "uart.h"
+#include "ringbuffer.h" 
 
 #define DEFAULT_RATE 115200;
 static speed_t baudrate_map(unsigned long b)
@@ -61,88 +62,6 @@ static speed_t baudrate_map(unsigned long b)
         case 115200:
             retval = B115200;
             break;
-
-#ifdef B230400
-        case 230400:
-            retval = B230400;
-            break;
-#endif
-
-#ifdef B460800
-        case 460800:
-            retval = B460800;
-            break;
-#endif
-
-#ifdef B500000
-        case 500000:
-            retval = B500000;
-            break;
-#endif
-
-#ifdef B576000
-        case 576000:
-            retval = B576000;
-            break;
-#endif
-
-#ifdef B921600
-        case 921600:
-            retval = B921600;
-            break;
-#endif
-
-#ifdef B1000000
-        case 1000000:
-            retval = B1000000;
-            break;
-#endif
-
-#ifdef B1152000
-        case 1152000:
-            retval = B1152000;
-            break;
-#endif
-
-#ifdef B1500000
-        case 1500000:
-            retval = B1500000;
-            break;
-#endif
-
-#ifdef B2000000
-        case 2000000:
-            retval = B2000000;
-            break;
-#endif
-
-#ifdef B2500000
-        case 2500000:
-            retval = B2500000;
-            break;
-#endif
-
-#ifdef B3000000
-        case 3000000:
-            retval = B3000000;
-            break;
-#endif
-
-#ifdef B3500000
-        case 3500000:
-            retval = B3500000;
-            break;
-#endif
-
-#ifdef B4000000
-        case 4000000:
-            retval = B4000000;
-            break;
-#endif
-
-        default:
-            retval = 0;
-            break;
     }
     return(retval);
 }
@@ -163,78 +82,14 @@ char *g_rxbuf=NULL;
 int  g_rxlen;
 int  g_isRxfinished=FALSE;
 
-char *ringbuf=NULL;
-#define  BUFSIZE 256
-#define  MINSIZE 13
-
-typedef struct 
-{
-	int storageaddr;
-	int processaddr;
-	int canstoragelen;
-	int canprocesslen;
-}RINGBUF_INFO;
-
-RINGBUF_INFO g_ringbufinfo;
+RINGBUFFER g_ringbufInfo;
 
 int readdataComplete(int val)
 {
 	g_isRxfinished=TRUE;
 	return g_isRxfinished;
 }
-int getuartData(char **buf,int *len)
-{
-	sem_wait(&g_sem_rx);
-	*buf=g_rxbuf;
-	*len=g_rxlen;
-	return 0;
-}
-static int readPost(char *buf ,int len)
-{
-	g_rxbuf=malloc(len);
-	g_rxlen=len;
-	memcpy(g_rxbuf,buf,len);
-	sem_post(&g_sem_rx);
-	return 0;
-}
-static int storagetoRingbuf(char *buf,int len)
-{
-	int i=0;
-	// printf("<%s>:%d %d %d %d len :%d \n",__func__,g_ringbufinfo.processaddr,g_ringbufinfo.canprocesslen,g_ringbufinfo.storageaddr,g_ringbufinfo.canstoragelen,len); 
-	if((BUFSIZE-g_ringbufinfo.storageaddr)<len){
-		memcpy(&ringbuf[g_ringbufinfo.storageaddr],buf,BUFSIZE-g_ringbufinfo.storageaddr);
-		memcpy(ringbuf,&buf[BUFSIZE-g_ringbufinfo.storageaddr],len-BUFSIZE+g_ringbufinfo.storageaddr);
-		g_ringbufinfo.storageaddr=len-BUFSIZE+g_ringbufinfo.storageaddr;
-	}
-	else{
-		memcpy(&ringbuf[g_ringbufinfo.storageaddr],buf,len);
-		g_ringbufinfo.storageaddr+=len;
-		if(g_ringbufinfo.storageaddr==BUFSIZE)
-			g_ringbufinfo.storageaddr=0;
-	}
-	g_ringbufinfo.canstoragelen-=len;
-	g_ringbufinfo.canprocesslen+=len;
-	// printf("\n<%s>:%d %d %d %d \n",__func__,g_ringbufinfo.processaddr,g_ringbufinfo.canprocesslen,g_ringbufinfo.storageaddr,g_ringbufinfo.canstoragelen); 
-	return 0;
-}
-static int getfromRingbuf(char *buf,int len)
-{
-	// printf("<%s>:%d %d %d %d len :%d \n",__func__,g_ringbufinfo.processaddr,g_ringbufinfo.canprocesslen,g_ringbufinfo.storageaddr,g_ringbufinfo.canstoragelen,len);
-	if(g_ringbufinfo.processaddr+len>BUFSIZE){
-		memcpy(buf,&ringbuf[g_ringbufinfo.processaddr],BUFSIZE-g_ringbufinfo.processaddr);
-		memcpy(&buf[BUFSIZE-g_ringbufinfo.processaddr],ringbuf,len-BUFSIZE+g_ringbufinfo.processaddr);
-		g_ringbufinfo.processaddr=len-BUFSIZE+g_ringbufinfo.processaddr;
-	}else{
-		memcpy(buf,&ringbuf[g_ringbufinfo.processaddr],len);
-		g_ringbufinfo.processaddr+=len;
-		if(g_ringbufinfo.processaddr==BUFSIZE)
-			g_ringbufinfo.processaddr=0;
-	}
-	g_ringbufinfo.canstoragelen+=len;
-	g_ringbufinfo.canprocesslen-=len;
-	// printf("<%s>:%d %d %d %d\n",__func__,g_ringbufinfo.processaddr,g_ringbufinfo.canprocesslen,g_ringbufinfo.storageaddr,g_ringbufinfo.canstoragelen); 
 
-}
 static int isprocessMessage(int *size)
 {
 	int i=0;
@@ -242,24 +97,24 @@ static int isprocessMessage(int *size)
 	int syn_flash=0;
 	int packet_flash=0;
 	int packetsize=0;
-	int detectsize=g_ringbufinfo.canprocesslen;
-	int startaddr =g_ringbufinfo.processaddr;
+	int detectsize=g_ringbufInfo.num;
+	int startaddr =g_ringbufInfo.getaddr;
+	show_ringbufferinfo(&g_ringbufInfo);
 	if(detectsize<7)
 		return 0;
 	for(i=0;i<detectsize;i++)
 	{
 		int ind=i+startaddr;
-		g_ringbufinfo.canprocesslen-=1;
-		g_ringbufinfo.canstoragelen+=1;
-		if(ind>BUFSIZE-1)
-			ind-=BUFSIZE;
-		g_ringbufinfo.processaddr=ind;	
-		if(ringbuf[ind]==SYN_SIGN){
+		g_ringbufInfo.num-=1;
+		if(ind>RINGBUFSIZE-1)
+			ind-=RINGBUFSIZE;
+		g_ringbufInfo.getaddr=ind;	
+		if(g_ringbufInfo.data[ind]==SYN_SIGN){
 			syn_flash=1;
 			continue;
 		}
 		if(syn_flash){
-			switch(ringbuf[ind])
+			switch(g_ringbufInfo.data[ind])
 			{
 				case VEHICLESTATUS:				
 				case SYSCONTROL_RX:
@@ -274,17 +129,15 @@ static int isprocessMessage(int *size)
 				continue;
 		}
 		if(packet_flash){
-			packetsize=ringbuf[ind];
-			if(g_ringbufinfo.canprocesslen<packetsize-2){				
-				g_ringbufinfo.canprocesslen+=3;
-				g_ringbufinfo.canstoragelen-=3;
-				g_ringbufinfo.processaddr=ind-2;
+			packetsize=g_ringbufInfo.data[ind];
+			if(g_ringbufInfo.num<packetsize-2){				
+				g_ringbufInfo.num+=3;
+				g_ringbufInfo.getaddr=ind-2;
 				retval=0;
 			}
 			else{
-				g_ringbufinfo.canprocesslen+=2;
-				g_ringbufinfo.canstoragelen-=2;
-				g_ringbufinfo.processaddr=ind-1;
+				g_ringbufInfo.num+=2;
+				g_ringbufInfo.getaddr=ind-1;
 				*size = packetsize;				
 				retval=1;
 			}
@@ -292,30 +145,30 @@ static int isprocessMessage(int *size)
 		}
 		
 	}
+	show_ringbufferinfo(&g_ringbufInfo);
 	return retval;
 }
 
 static void *uartRead(void * threadParameter)
 {
-	char *rx;
-	int iores, iocount=1,len=0;
+	u8 data[RINGBUFSIZE];
+	int iores, iocount=0,len=0,isSync=0;
+	int old =0;
 	printf("uartRead thread \n");
 	while(g_rrun) { 
 		iores = ioctl(g_fd_uart, FIONREAD, &iocount);
 		if(iocount){
-         	rx = malloc(iocount);
-        	iores = read(g_fd_uart, rx, iocount);
-        	storagetoRingbuf(rx,iocount);
-        	free(rx);
+			memset(data,0,sizeof(data));
+        	iores = read(g_fd_uart, data, iocount);
+        	printf("iocount %d \n",iocount );
+        	putdatatoBuffer(&g_ringbufInfo,data,iocount);
         	if(isprocessMessage(&len)){
-        		rx=malloc(len);
-        		getfromRingbuf(rx,len);
+ 				memset(data,0,sizeof(data));
+        		getdatafromBuffer(&g_ringbufInfo,data,len);
         		for(iocount=0;iocount<len;iocount++)
-        		   printf("0x%x ",rx[iocount]);
+        		   printf("0x%x ",data[iocount]);
         		   printf("\n");
-        		// printf("%d %d %d %d\n",g_ringbufinfo.processaddr,g_ringbufinfo.canprocesslen,g_ringbufinfo.storageaddr,g_ringbufinfo.canstoragelen);   
-        		message_resolver(rx);
-        		free(rx);
+        		message_resolver(data);
         	}	 	
 		}
 	}
@@ -426,12 +279,8 @@ int uartInit(int argc ,char **argv)
 	g_rrun = 1;
 	g_trun = 1;
 
-	ringbuf=(char *)malloc(BUFSIZE);
-
-	g_ringbufinfo.storageaddr=0;
-	g_ringbufinfo.processaddr=0;
-	g_ringbufinfo.canstoragelen=BUFSIZE;
-	g_ringbufinfo.canprocesslen=0;
+	memset(&g_ringbufInfo,0,sizeof(g_ringbufInfo));
+	ringbufferInit(&g_ringbufInfo,RINGBUFSIZE);
 
 	
 
@@ -457,8 +306,6 @@ void uartRelease()
 {
 	int ret;
 	g_rrun = 0;
-	
-	free(ringbuf);
 	sem_post(&g_sem_rx);
 	ret = pthread_join(p_Uartread, NULL);
 	if(ret < 0)

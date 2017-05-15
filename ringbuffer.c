@@ -5,11 +5,15 @@
 #include <string.h>
 
 
-
+void show_ringbufferinfo(RINGBUFFER *info)
+{
+	printf("putaddr:%d  getaddr %d  num:%d size:%d\n",
+			info->putaddr,info->getaddr,info->num,info->size);
+}
 
 int ringbufferInit(RINGBUFFER *info,int size)
 {
-	info->data=malloc(size);
+	info->data=(u8 *)malloc(size);
 	memset(info->data,0,size);
 	info->getaddr=0;
 	info->putaddr=0;
@@ -48,14 +52,53 @@ int getdatafromBuffer(RINGBUFFER *info,char *buf,int len)
 	info->num-=len;
 	return 0;
 }
+
 int addringaddr(int addr)
 {
 	return ((addr+1)<RINGBUFSIZE)?addr+1:0;
+}
+int detectSync(RINGBUFFER *info,u8 sync)
+{
+	show_ringbufferinfo(info);
+	if(info->num<=0)
+		return 0;
+	while(info->num>0){
+		if(info->data[info->getaddr]==sync){
+			return 1;
+		}
+		info->getaddr=addringaddr(info->getaddr);
+		info->num-=1;
+	}
+	show_ringbufferinfo(info);
+	return 0;
 }
 int isprocessMsg(RINGBUFFER *info,int *len)
 {
 	if(info->num<7)
 		return 0;
 	
+	
 	return 	1;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
