@@ -21,6 +21,9 @@
 #define SPEED_CONEFFICIENT 0.05625
 #define STEERINGANGLE_CONEFFICIENT 0.1
 
+#define u8  unsigned char
+#define u16 unsigned short
+#define u32 unsigned int
 
 
 typedef struct{
@@ -66,7 +69,7 @@ typedef struct
 }WARNNIG_CENTER;
 
 typedef struct {
-	char *addr;
+	u8 *addr;
 	int len;
 }BUFINFO;
 
