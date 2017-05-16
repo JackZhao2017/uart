@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "crc8.h"
+#include "cmdqueue.h"
 
 
 
@@ -12,7 +13,7 @@ typedef struct{
 }POSITION;
 
 VEHICLESTATUS_INFO g_vehicleInfo;
-SYS_CTRLINFO 	   g_sysctrl_rx[256];
+
 
 
 void getVehiclestatusInfo(VEHICLESTATUS_INFO *vehicleInfo)
@@ -44,28 +45,21 @@ static void vehiclestatus_resolver(u8 *message)
 	val[3]=(message[4]&0x04)?1:0;
 	vehiclestatus_caculate(val);
 }
-void cleanCommand(void)
-{
-	memset(&g_sysctrl_rx,0,sizeof(g_sysctrl_rx));
-}
-int  getCommand(int *cmd)
-{
-	*cmd=g_sysctrl_rx.Commad;
-	return g_sysctrl_rx.Seqnum;
-}
-
-
 static void syscontrol_rx_resolver(u8 *message)
 {
-	memset(&g_sysctrl_rx,0,sizeof(g_sysctrl_rx));
+	SYS_CTRLINFO   sysctrl_rx;
+	memset(&sysctrl_rx,0,sizeof(sysctrl_rx));
 
-	g_sysctrl_rx.Seqnum=message[2];
-	g_sysctrl_rx.Commad=message[3];
-	if(g_sysctrl_rx.Commad&0x80){
-		g_sysctrl_rx.data=malloc(message[4]);
-		memcpy(g_sysctrl_rx.data,&message[5],message[4]);
-		g_sysctrl_rx.datalen=message[4];
+	sysctrl_rx.Seqnum=message[2];
+	sysctrl_rx.Commad=message[3];
+	if(sysctrl_rx.Commad&0x80){
+		sysctrl_rx.data=malloc(message[4]);
+		memcpy(sysctrl_rx.data,&message[5],message[4]);
+		sysctrl_rx.datalen=message[4];
 	}
+	putcmdintoQueue(sysctrl_rx);
+	if(sysctrl_rx.data)
+		free(sysctrl_rx.data);
 }
 
 static int crc8_detect(u8 *message)
@@ -84,7 +78,7 @@ int message_resolver(u8 *message)
 {
 	 int retval=0;
 	 if(crc8_detect(message)<0){
-	 	printf("%s crc8 not correct\n",__func__);
+	 	printf("%s crc8 not right\n",__func__);
 	 	return -1;
 	 }
 	 switch(message[0])

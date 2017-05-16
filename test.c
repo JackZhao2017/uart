@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include "crc8.h"
 #include "capturetimer.h"
+#include "cmdqueue.h"
 int ctrl_c_rev = 1;
 void ctrl_c_handler(int signum, siginfo_t *info, void *myact)
 {
@@ -37,6 +38,8 @@ int main(int argc ,char **argv)
     }
 	crcInit(LSB,POLY);
 	WARNNIG_CENTER center;
+	SYS_CTRLINFO   syscmd;
+	memset(&syscmd,0,sizeof(syscmd));
 	memset(&center,0,sizeof(center));
 	while(ctrl_c_rev)
 	{	
@@ -55,11 +58,18 @@ int main(int argc ,char **argv)
 		center.vehicle_info.fcwenabled=1;
 		message_creator(center,VEHICLESTATUS,bufinfo);
 		uartsendData(bufinfo.addr ,bufinfo.len);
-
+		usleep(100);
+		while(issendBusy());
+		uartsendData(cmd,sizeof(cmd));
 		
 		getVehiclestatusInfo(&g_mVehicleInfo);
-		seqnum=getCommand(&commad);
-		cleanCommand();
+		if(iscmdneedProcess()){
+			getcmdfromQueue(&syscmd);
+			printf("\nseqnum: %d \n"
+				   "commad   %d \n",
+				   syscmd.Seqnum,syscmd.Commad
+				  );
+		}
 		if(g_mVehicleInfo.ldwenabled)
 			printf("\nspeed :            %f \n"	   		   
 	   			"headlightstatus    %d \n"
