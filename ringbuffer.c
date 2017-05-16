@@ -58,7 +58,7 @@ int addringaddr(RINGBUFFER *info)
 {
 	int addr=info->getaddr;
 	info->num-=1;
-	return ((addr+1)<RINGBUFSIZE)?addr+1:0;
+	return ((addr+1)<RINGBUFSIZE)?(addr+1):0;
 }
 int detectSync(RINGBUFFER *info,u8 sync)
 {
@@ -95,7 +95,7 @@ int detectMsginfo(RINGBUFFER *info,int *len)
 	}
 	*len=info->data[info->getaddr+1];
 	if(info->num+1<*len)
-		val=0;
+		*len=0;
 	show_ringbufferinfo(info);
 	return  val;
 }
