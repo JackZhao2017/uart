@@ -68,6 +68,8 @@ static speed_t baudrate_map(unsigned long b)
 
 #define TRUE  1
 #define FALSE 0
+
+
 char 		*g_uartDev="/dev/ttymxc2";
 int  		g_fd_uart=0;
 pthread_t 	p_Uartsend, p_Uartread;
@@ -77,6 +79,7 @@ sem_t 		g_sem_tx,g_sem_rx;
 
 char *g_txbuf=NULL;
 int  g_txlen;
+#define TXBUFSIZE 256
 int  g_isTxfinished=FALSE;
 
 RINGBUFFER g_ringbufInfo;
@@ -92,27 +95,24 @@ static void *uartRead(void * threadParameter)
 		if(iocount){
 			memset(data,0,sizeof(data));
         	iores = read(g_fd_uart, data, iocount);
-        	for(i=0;i<iocount;i++)
-        		   	printf("0x%x ",data[i]);
-        	printf("\n");
         	putdatatoBuffer(&g_ringbufInfo,data,iocount);
-        	if(!isSync)
+		}
+		if(!isSync)
         		isSync=detectSync(&g_ringbufInfo,SYN_SIGN);
-        	if(isSync){
-        		if(detectMsginfo(&g_ringbufInfo,&len)){
-        			if(len){
-        				getdatafromBuffer(&g_ringbufInfo,data,len);
-        				for(i=0;i<len;i++)
-        		   		printf("0x%x ",data[i]);
-        		   		printf("\n");
-        				retval=message_resolver(data);
-        				isSync=0;
-        			}
-        		}else{
+        if(isSync){
+        	if(detectMsginfo(&g_ringbufInfo,&len)){
+        		if(len){
+        			getdatafromBuffer(&g_ringbufInfo,data,len);
+        			for(i=0;i<len;i++)
+        		   	printf("0x%x ",data[i]);
+        		   	printf("\n");
+        			retval=message_resolver(data);
         			isSync=0;
         		}
-        	}	 	
-		}
+        	}else{
+        			isSync=0;
+        	}
+        }	 	
 	}
 	pthread_exit(NULL);
 }
@@ -125,9 +125,7 @@ int issendBusy()
 
 int uartsendData(char *buf ,int len)
 {
-	if(g_txbuf)
-		free(g_txbuf);
-	g_txbuf=malloc(len);
+	memset(g_txbuf,0,TXBUFSIZE);
 	memcpy(g_txbuf,buf,len);
 	g_txlen=len;
 	sem_post(&g_sem_tx);
@@ -140,9 +138,9 @@ static void *uartWrite(void * threadParameter)
 	while(g_trun)
 	{
 		sem_wait(&g_sem_tx);
-		g_isTxfinished=FALSE;
-		write(g_fd_uart,g_txbuf,g_txlen);
 		g_isTxfinished=TRUE;
+		write(g_fd_uart,g_txbuf,g_txlen);
+		g_isTxfinished=FALSE;
 	}
 	pthread_exit(NULL);
 }
@@ -220,7 +218,7 @@ int uartInit(int argc ,char **argv)
 
 	g_rrun = 1;
 	g_trun = 1;
-
+	g_txbuf=malloc(TXBUFSIZE);
 	memset(&g_ringbufInfo,0,sizeof(g_ringbufInfo));
 	ringbufferInit(&g_ringbufInfo,RINGBUFSIZE);
 
@@ -258,6 +256,8 @@ void uartRelease()
 	if(ret < 0)
 		printf("fail to stop Uartsend thread\n");
 	close(g_fd_uart);
+	if(g_txbuf)
+		free(g_txbuf);
 	printf("%s\n",__func__ );
 }
 
