@@ -100,11 +100,15 @@ static void *uartRead(void * threadParameter)
         		isSync=detectSync(&g_ringbufInfo,SYN_SIGN);
         	if(isSync){
         		if(detectMsginfo(&g_ringbufInfo,&len)){
-        			getdatafromBuffer(&g_ringbufInfo,data,len);
-        			for(i=0;i<len;i++)
-        		   	printf("0x%x ",data[i]);
-        		   	printf("\n");
-        			retval=message_resolver(data);
+        			if(len){
+        				getdatafromBuffer(&g_ringbufInfo,data,len);
+        				for(i=0;i<len;i++)
+        		   		printf("0x%x ",data[i]);
+        		   		printf("\n");
+        				retval=message_resolver(data);
+        				isSync=0;
+        			}
+        		}else{
         			isSync=0;
         		}
         	}	 	
