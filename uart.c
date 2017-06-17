@@ -89,24 +89,45 @@ static void *uartRead(void * threadParameter)
 	u8 data[RINGBUFSIZE];
 	int iores, iocount=0,len=0,isSync=0,retval=0;
 	int i =0;
+	struct timeval tv;
+	fd_set r_fds;
 	printf("uartRead thread \n");
 	while(g_rrun) { 
-		iores = ioctl(g_fd_uart, FIONREAD, &iocount);
-		if(iocount){
-			memset(data,0,sizeof(data));
-        	iores = read(g_fd_uart, data, iocount);
-        	putdatatoBuffer(&g_ringbufInfo,data,iocount);
+		FD_ZERO(&r_fds);
+		FD_SET(g_fd_uart,&r_fds);
+		tv.tv_sec = 1;
+		tv.tv_usec = 0;	
+		iores = select(g_fd_uart + 1,&r_fds,NULL,NULL,&tv);
+		switch(iores){
+			case -1:
+				printf("-----------------------------select\n");
+ 				break;
+ 			case 0:
+  				printf("-----------------------------time out\n");
+				break;
+			default:
+				iores = ioctl(g_fd_uart, FIONREAD, &iocount);
+				if(iocount){
+						memset(data,0,sizeof(data));
+        				iores = read(g_fd_uart, data, iocount);
+        				putdatatoBuffer(&g_ringbufInfo,data,iocount);
+				}
+				break;
 		}
+
 		if(!isSync)
         		isSync=detectSync(&g_ringbufInfo,SYN_SIGN);
         if(isSync){
         	if(detectMsginfo(&g_ringbufInfo,&len)){
         		if(len){
         			getdatafromBuffer(&g_ringbufInfo,data,len);
+        			printf("\n--------------------len  %d\n",len);
         			for(i=0;i<len;i++)
-        		   	printf("0x%x ",data[i]);
-        		   	printf("\n");
+        		   		printf("0x%x ",data[i]);
+        		   	printf("\n---------------------------\n");
         			retval=message_resolver(data);
+        			if(retval<0)
+        				printf("%s resolver faild \n",__func__);
         			isSync=0;
         		}
         	}else{
